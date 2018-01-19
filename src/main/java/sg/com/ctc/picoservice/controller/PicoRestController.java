@@ -86,7 +86,10 @@ public class PicoRestController {
 			StatusLine line = response.getStatusLine();
 			if (line.getStatusCode() == 200) {
 				Util.saveImage(content, filename);
-				Util.resize(filename, filename, Double.parseDouble(env.getProperty("imgResizePercentage")));
+				Util.resize(filename, filename, Integer.parseInt(env.getProperty("imgResizeWidth")),
+						Integer.parseInt(env.getProperty("imgResizeHeight")));
+				// Util.resize(filename, filename,
+				// Double.parseDouble(env.getProperty("imgResizePercentage")));
 			}
 
 			String boundary = "---------------" + photoId;
