@@ -50,7 +50,7 @@ public class MeetingRoomDaoImpl extends AbstractDao<Integer, BookRoomTrans> impl
     @SuppressWarnings("unchecked")
     public List<BookRoomTrans> findMeetingRoomBookingByDate(Date date, String id){
     	Criteria criteria = createEntityCriteria();
-        criteria.add(Restrictions.ge("eventStartTime", LocalDateTime.fromDateFields(date)));
+        criteria.add(Restrictions.ge("eventEndTime", LocalDateTime.fromDateFields(date)));
         criteria.add(Restrictions.eq("id", id));
         criteria.addOrder(Order.asc("eventStartTime"));
         return (List<BookRoomTrans>) criteria.list();

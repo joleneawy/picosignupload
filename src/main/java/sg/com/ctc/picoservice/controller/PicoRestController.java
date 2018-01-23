@@ -29,7 +29,11 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 
 import sg.com.ctc.picoservice.model.BookRoomTrans;
+import sg.com.ctc.picoservice.model.EventTrans;
+import sg.com.ctc.picoservice.model.RoomMast;
+import sg.com.ctc.picoservice.service.EventTransService;
 import sg.com.ctc.picoservice.service.MeetingRoomService;
+import sg.com.ctc.picoservice.service.RoomMastService;
 import sg.com.ctc.picoservice.util.Util;
 
 @RestController
@@ -38,6 +42,12 @@ public class PicoRestController {
 
 	@Autowired
 	MeetingRoomService service;
+	
+	@Autowired
+	RoomMastService roomMastService;
+	
+	@Autowired
+	EventTransService eventTransService;
 
 	@Autowired
 	private Environment env;
@@ -52,17 +62,35 @@ public class PicoRestController {
 				.setConnectionRequestTimeout(timeout * 1000).setSocketTimeout(timeout * 1000).build();
 		String photoId = UUID.randomUUID().toString();
 		List<BookRoomTrans> meetingRooms = service.findMeetingRoomBookingByDate(new Date(), meetingRoomId);
-
+		RoomMast room = roomMastService.findById(meetingRoomId);
+		
 		String filename = env.getProperty("imageFilePath") + photoId + ".png";
 		String text = "Meeting Room is available at the moment";
+		String roomName = "";
+		String meetingAgenda = "";
+		if(room!=null){
+			roomName = room.getName();
+		}
+		System.out.println("Meeting Room Size: "+meetingRooms.size());
 		if (meetingRooms.size() > 0) {
-			text = meetingRooms.get(0).getUser() + " booked from "
+			
+			EventTrans trans = eventTransService.findById(meetingRooms.get(0).getEventId());
+			if(trans!=null){
+				meetingAgenda = trans.getName();
+			}
+			
+			text = "Meeting Room " + roomName + " booked by " + meetingRooms.get(0).getUser() + "on "
+					+ meetingRooms.get(0).getEventStartDate().getDayOfMonth() + "/"
+					+ meetingRooms.get(0).getEventStartDate().getMonthOfYear() + "/"+
+					+ meetingRooms.get(0).getEventStartDate().getYear()+" from "
 					+ meetingRooms.get(0).getEventStartTime().getHourOfDay() + ":"
 					+ meetingRooms.get(0).getEventStartTime().getMinuteOfHour() + ":"
 					+ meetingRooms.get(0).getEventStartTime().getSecondOfMinute() + " until "
 					+ meetingRooms.get(0).getEventEndTime().getHourOfDay() + ":"
 					+ meetingRooms.get(0).getEventEndTime().getMinuteOfHour() + ":"
-					+ meetingRooms.get(0).getEventEndTime().getSecondOfMinute();
+					+ meetingRooms.get(0).getEventEndTime().getSecondOfMinute() + " for " + meetingAgenda;
+		}else{
+			text = "Meeting Room "+roomName+" is available at the moment";
 		}
 
 		CloseableHttpClient httpClientForGet = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
