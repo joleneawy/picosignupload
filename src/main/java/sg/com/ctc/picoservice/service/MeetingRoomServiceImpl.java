@@ -27,6 +27,7 @@ public class MeetingRoomServiceImpl implements MeetingRoomService{
 
     public void saveMeetingRoomBooking(BookRoomTrans meetingRoom) {
     	meetingRoom.setStatus("A");
+    	meetingRoom.setId("SGFE");
     	meetingRoom.setEventDateCreated(new LocalDateTime());
         dao.saveMeetingRoomBooking(meetingRoom);
     }

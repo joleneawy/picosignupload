@@ -63,17 +63,11 @@ public class AppController {
 			return "registration";
 		}
 
-		/*
-		 * Preferred way to achieve uniqueness of field [ssn] should be implementing custom @Unique annotation 
-		 * and applying it on field [ssn] of Model class [Employee].
-		 * 
-		 * Below mentioned peace of code [if block] is to demonstrate that you can fill custom errors outside the validation
-		 * framework as well while still using internationalized messages.
-		 * 
-		 */
 		if(!service.isEventIdUnique(meetingRoom.getId(), meetingRoom.getEventId())){
 			FieldError codeError =new FieldError("meetingRoom","eventId",messageSource.getMessage("non.unique.code", new Integer[]{meetingRoom.getEventId()}, Locale.getDefault()));
 		    result.addError(codeError);
+		    model.addAttribute("meetingRoom", meetingRoom);
+		    model.addAttribute("edit", false);
 			return "registration";
 		}
 		
@@ -102,19 +96,12 @@ public class AppController {
 	@RequestMapping(value = { "/edit-{eventId}-meetingRoom" }, method = RequestMethod.POST)
 	public String updateMeetingRoomBooking(@Valid BookRoomTrans meetingRoom, BindingResult result,
 			ModelMap model, @PathVariable int eventId) {
-
+		
 		if (result.hasErrors()) {
 			return "registration";
 		}
 
-		if(!service.isEventIdUnique(meetingRoom.getId(), meetingRoom.getEventId())){
-			FieldError ssnError =new FieldError("meetingRoom","eventId",messageSource.getMessage("non.unique.code", new Integer[]{meetingRoom.getEventId()}, Locale.getDefault()));
-		    result.addError(ssnError);
-			return "registration";
-		}
-
 		service.updateMeetingRoomBooking(meetingRoom);
-
 		model.addAttribute("success", "MeetingRoom " + meetingRoom.getEventId()	+ " updated successfully");
 		return "success";
 	}

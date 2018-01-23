@@ -78,24 +78,29 @@ public class PicoRestController {
 			if(trans!=null){
 				meetingAgenda = trans.getName();
 			}
-			
-			text = "Meeting Room " + roomName + " booked by " + meetingRooms.get(0).getUser() + "on "
-					+ meetingRooms.get(0).getEventStartDate().getDayOfMonth() + "/"
-					+ meetingRooms.get(0).getEventStartDate().getMonthOfYear() + "/"+
-					+ meetingRooms.get(0).getEventStartDate().getYear()+" from "
-					+ meetingRooms.get(0).getEventStartTime().getHourOfDay() + ":"
-					+ meetingRooms.get(0).getEventStartTime().getMinuteOfHour() + ":"
-					+ meetingRooms.get(0).getEventStartTime().getSecondOfMinute() + " until "
-					+ meetingRooms.get(0).getEventEndTime().getHourOfDay() + ":"
-					+ meetingRooms.get(0).getEventEndTime().getMinuteOfHour() + ":"
-					+ meetingRooms.get(0).getEventEndTime().getSecondOfMinute() + " for " + meetingAgenda;
-		}else{
-			text = "Meeting Room "+roomName+" is available at the moment";
+
+			text = Util.buildSpace(10) + "Meeting Room " + roomName + " booked by " + meetingRooms.get(0).getUser()
+					+ "\n" + " on " + meetingRooms.get(0).getEventStartDate().getDayOfMonth() + " / "
+					+ meetingRooms.get(0).getEventStartDate().getMonthOfYear() + " / "
+					+ +meetingRooms.get(0).getEventStartDate().getYear() + " from "
+					+ Util.rebuildTime(meetingRooms.get(0).getEventStartTime().getHourOfDay()) + " : "
+					+ Util.rebuildTime(meetingRooms.get(0).getEventStartTime().getMinuteOfHour()) + " : "
+					+ Util.rebuildTime(meetingRooms.get(0).getEventStartTime().getSecondOfMinute()) + " until "
+					+ Util.rebuildTime(meetingRooms.get(0).getEventEndTime().getHourOfDay()) + " : "
+					+ Util.rebuildTime(meetingRooms.get(0).getEventEndTime().getMinuteOfHour()) + " : "
+					+ Util.rebuildTime(meetingRooms.get(0).getEventEndTime().getSecondOfMinute()) + " for "
+					+ meetingAgenda;
+		} else {
+			text = "Meeting Room " + roomName + " is available at the moment";
 		}
+		
+		System.out.println("Meeting Room Text: "+text);
+		
 
 		CloseableHttpClient httpClientForGet = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
 
 		try {
+			System.out.println("Encode text: "+URLEncoder.encode(text, "UTF-8"));
 			String requestURLForGet = env.getProperty("img4meRestUrl") + "?bcolor="
 					+ env.getProperty("img4meBackgroudColor") + "&fcolor=" + env.getProperty("img4meFontColor")
 					+ "&font=" + env.getProperty("img4meFont") + "&size=" + env.getProperty("img4meFontSize") + "&type="
@@ -119,7 +124,7 @@ public class PicoRestController {
 				// Util.resize(filename, filename,
 				// Double.parseDouble(env.getProperty("imgResizePercentage")));
 			}
-
+			System.out.println("Response pic: "+line);
 			String boundary = "---------------" + photoId;
 	
 			CloseableHttpClient httpClient = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
@@ -158,7 +163,7 @@ public class PicoRestController {
 			}
 
 		} catch (Exception e) {
-			throw new NotFoundException("Failed upload");
+			throw new NotFoundException("Failed upload: "+e.getMessage());
 		}
 		
 		return "Sucessful";
@@ -167,7 +172,9 @@ public class PicoRestController {
 	@SuppressWarnings("serial")
 	@ResponseStatus(value = HttpStatus.NOT_FOUND)
 	public class NotFoundException extends Exception {
+		
 		public NotFoundException(String message) {
+			System.out.println("Error message: "+message);
 	    }
 	}
 
