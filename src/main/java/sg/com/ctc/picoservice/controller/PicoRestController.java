@@ -6,7 +6,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -27,6 +26,7 @@ import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import org.joda.time.LocalDateTime;
 
 import sg.com.ctc.picoservice.model.BookRoomTrans;
 import sg.com.ctc.picoservice.model.EventTrans;
@@ -42,10 +42,10 @@ public class PicoRestController {
 
 	@Autowired
 	MeetingRoomService service;
-	
+
 	@Autowired
 	RoomMastService roomMastService;
-	
+
 	@Autowired
 	EventTransService eventTransService;
 
@@ -53,54 +53,105 @@ public class PicoRestController {
 	private Environment env;
 
 	@RequestMapping(value = {
-			"/generate/{id}/{meetingRoomId}" }, method = RequestMethod.GET, headers = "Accept=application/json")
+			"/generateimage/{meetingRoomId}" }, method = RequestMethod.GET, headers = "Accept=application/json")
 	@ResponseStatus(value = HttpStatus.OK)
-	public String generate(@PathVariable String id, @PathVariable String meetingRoomId) throws NotFoundException {
-
+	public String generateImage(@PathVariable String meetingRoomId) throws NotFoundException {
 		int timeout = 300;
 		RequestConfig config = RequestConfig.custom().setConnectTimeout(timeout * 1000)
 				.setConnectionRequestTimeout(timeout * 1000).setSocketTimeout(timeout * 1000).build();
-		String photoId = UUID.randomUUID().toString();
+
 		List<BookRoomTrans> meetingRooms = service.findMeetingRoomBookingByDate(new Date(), meetingRoomId);
 		RoomMast room = roomMastService.findById(meetingRoomId);
-		
-		String filename = env.getProperty("imageFilePath") + photoId + ".png";
-		String text = "Meeting Room is available at the moment";
+
+		String filename = env.getProperty("imageFilePath") + env.getProperty("imageFileName") + ".png";
+		String text = "";
 		String roomName = "";
-		String meetingAgenda = "";
-		if(room!=null){
+		String roomPax = "";
+		String meetingAgenda = "No Title";
+		String nextMeetingAgenda = "No Title";
+		if (room != null) {
 			roomName = room.getName();
+			roomPax = room.getDesc1().replaceAll("<li>Capacity :", "");
 		}
-		System.out.println("Meeting Room Size: "+meetingRooms.size());
 		if (meetingRooms.size() > 0) {
-			
-			EventTrans trans = eventTransService.findById(meetingRooms.get(0).getEventId());
-			if(trans!=null){
-				meetingAgenda = trans.getName();
+			BookRoomTrans currentRoom = null;
+			BookRoomTrans nextRoom = null;
+			int i = 0;
+			int n = 0;
+			for (BookRoomTrans r : meetingRooms) {
+
+				LocalDateTime date = LocalDateTime.now();
+				if (currentRoom == null) {
+					if ((date.equals(r.getEventStartTime()) || date.isAfter(r.getEventStartTime()))
+							&& (date.equals(r.getEventEndTime()) || date.isBefore(r.getEventEndTime()))) {
+						currentRoom = r;
+						n = i;
+					}
+				} else {
+					if (i == n + 1) {
+						nextRoom = r;
+					}
+				}
+				i++;
 			}
 
-			text = Util.buildSpace(10) + "Meeting Room " + roomName + " booked by " + meetingRooms.get(0).getUser()
-					+ "\n" + " on " + meetingRooms.get(0).getEventStartDate().getDayOfMonth() + " / "
-					+ meetingRooms.get(0).getEventStartDate().getMonthOfYear() + " / "
-					+ +meetingRooms.get(0).getEventStartDate().getYear() + " from "
-					+ Util.rebuildTime(meetingRooms.get(0).getEventStartTime().getHourOfDay()) + " : "
-					+ Util.rebuildTime(meetingRooms.get(0).getEventStartTime().getMinuteOfHour()) + " : "
-					+ Util.rebuildTime(meetingRooms.get(0).getEventStartTime().getSecondOfMinute()) + " until "
-					+ Util.rebuildTime(meetingRooms.get(0).getEventEndTime().getHourOfDay()) + " : "
-					+ Util.rebuildTime(meetingRooms.get(0).getEventEndTime().getMinuteOfHour()) + " : "
-					+ Util.rebuildTime(meetingRooms.get(0).getEventEndTime().getSecondOfMinute()) + " for "
-					+ meetingAgenda;
+			if (currentRoom == null) {
+				nextRoom = meetingRooms.get(0);
+			}
+
+			if (currentRoom != null) {
+				EventTrans trans = eventTransService.findById(currentRoom.getEventId());
+				if (trans != null) {
+					meetingAgenda = trans.getName();
+				}
+				
+				text = "Meeting Room: " + roomName + "( " + roomPax + " )" + "\n" + " booked by "
+						+ currentRoom.getUser() + "\n" + " on " + currentRoom.getEventStartDate().getDayOfMonth()
+						+ " / " + currentRoom.getEventStartDate().getMonthOfYear() + " / "
+						+ currentRoom.getEventStartDate().getYear() + " from "
+						+ Util.rebuildTime(currentRoom.getEventStartTime().getHourOfDay()) + " : "
+						+ Util.rebuildTime(currentRoom.getEventStartTime().getMinuteOfHour()) + " : "
+						+ Util.rebuildTime(currentRoom.getEventStartTime().getSecondOfMinute()) + " until "
+						+ Util.rebuildTime(currentRoom.getEventEndTime().getHourOfDay()) + " : "
+						+ Util.rebuildTime(currentRoom.getEventEndTime().getMinuteOfHour()) + " : "
+						+ Util.rebuildTime(currentRoom.getEventEndTime().getSecondOfMinute()) + "\n" + " for "
+						+ meetingAgenda + "\n" + "Upcoming Booking: \n";
+				
+				if (nextRoom != null) {
+					
+					EventTrans trans2 = eventTransService.findById(nextRoom.getEventId());					
+					if (trans2 != null) {
+						nextMeetingAgenda = trans2.getName();
+					}
+
+					text = text
+							+ nextRoom.getEventStartDate().getDayOfMonth() + " / "
+							+ nextRoom.getEventStartDate().getMonthOfYear() + " / "
+							+ nextRoom.getEventStartDate().getYear() + " from "
+							+ Util.rebuildTime(nextRoom.getEventStartTime().getHourOfDay()) + " : "
+							+ Util.rebuildTime(nextRoom.getEventStartTime().getMinuteOfHour()) + " : "
+							+ Util.rebuildTime(nextRoom.getEventStartTime().getSecondOfMinute()) + " until "
+							+ Util.rebuildTime(nextRoom.getEventEndTime().getHourOfDay()) + " : "
+							+ Util.rebuildTime(nextRoom.getEventEndTime().getMinuteOfHour()) + " : "
+							+ Util.rebuildTime(nextRoom.getEventEndTime().getSecondOfMinute()) + "\n" + " for "
+							+ nextMeetingAgenda + "\n";
+				}else{
+					text = text + "AVAILABLE" + "\n";
+				}
+			}
 		} else {
-			text = "Meeting Room " + roomName + " is available at the moment";
+			text = "Meeting Room: " + roomName + "( " + roomPax + " )" + "\n" + "\n" + Util.buildSpace(18) + "AVAILABLE"
+					+ "\n\n"
+					+ "Upcoming Booking: \n"
+					+ "AVAILABLE \n";
 		}
-		
-		System.out.println("Meeting Room Text: "+text);
-		
+
+		System.out.println("Meeting Room Text: " + text);
 
 		CloseableHttpClient httpClientForGet = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
 
 		try {
-			System.out.println("Encode text: "+URLEncoder.encode(text, "UTF-8"));
+			System.out.println("Encode text: " + URLEncoder.encode(text, "UTF-8"));
 			String requestURLForGet = env.getProperty("img4meRestUrl") + "?bcolor="
 					+ env.getProperty("img4meBackgroudColor") + "&fcolor=" + env.getProperty("img4meFontColor")
 					+ "&font=" + env.getProperty("img4meFont") + "&size=" + env.getProperty("img4meFontSize") + "&type="
@@ -124,9 +175,28 @@ public class PicoRestController {
 				// Util.resize(filename, filename,
 				// Double.parseDouble(env.getProperty("imgResizePercentage")));
 			}
-			System.out.println("Response pic: "+line);
+			System.out.println("Response pic: " + line);
+		} catch (Exception e) {
+			throw new NotFoundException("Failed upload: " + e.getMessage());
+		}
+
+		return "Sucessful";
+	}
+
+	@RequestMapping(value = { "/generate/{id}" }, method = RequestMethod.GET, headers = "Accept=application/json")
+	@ResponseStatus(value = HttpStatus.OK)
+	public String generate(@PathVariable String id) throws NotFoundException {
+
+		int timeout = 300;
+		RequestConfig config = RequestConfig.custom().setConnectTimeout(timeout * 1000)
+				.setConnectionRequestTimeout(timeout * 1000).setSocketTimeout(timeout * 1000).build();
+		String photoId = UUID.randomUUID().toString();
+		String filename = env.getProperty("imageFilePath") + env.getProperty("imageFileName") + ".png";
+
+		try {
+
 			String boundary = "---------------" + photoId;
-	
+
 			CloseableHttpClient httpClient = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
 			String requestURL = env.getProperty("picoRestUrl") + id
 					+ "?display=0&process=true&singleupdate=false&nodither=false&whitebg="
@@ -163,19 +233,19 @@ public class PicoRestController {
 			}
 
 		} catch (Exception e) {
-			throw new NotFoundException("Failed upload: "+e.getMessage());
+			throw new NotFoundException("Failed upload: " + e.getMessage());
 		}
-		
+
 		return "Sucessful";
 	}
-	
+
 	@SuppressWarnings("serial")
 	@ResponseStatus(value = HttpStatus.NOT_FOUND)
 	public class NotFoundException extends Exception {
-		
+
 		public NotFoundException(String message) {
-			System.out.println("Error message: "+message);
-	    }
+			System.out.println("Error message: " + message);
+		}
 	}
 
 }
