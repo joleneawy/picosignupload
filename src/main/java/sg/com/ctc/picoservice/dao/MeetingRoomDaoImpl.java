@@ -52,6 +52,7 @@ public class MeetingRoomDaoImpl extends AbstractDao<Integer, BookRoomTrans> impl
     	Criteria criteria = createEntityCriteria();
         criteria.add(Restrictions.ge("eventEndTime", LocalDateTime.fromDateFields(date)));
         criteria.add(Restrictions.eq("id", id));
+        criteria.add(Restrictions.eq("status", "A"));
         criteria.addOrder(Order.asc("eventStartTime"));
         return (List<BookRoomTrans>) criteria.list();
     }
