@@ -45,7 +45,6 @@ public class AppController {
 
 		List<BookRoomTrans> meetingRooms = service.findMeetingRoomBookingByDate(new Date(), meetingRoomId);
 		RoomMast room = roomMastService.findById(meetingRoomId);
-
 		String meetingRoom = "";
 		String result1 = "";
 		String result2 = "";
@@ -104,26 +103,30 @@ public class AppController {
 						+ Util.rebuildTime(currentRoom.getEventEndTime().getSecondOfMinute()) + "\n" + " for "
 						+ meetingAgenda;
 
-				if (nextRoom != null) {
-					
-					EventTrans trans2 = eventTransService.findById(nextRoom.getEventId());					
-					if (trans2 != null) {
-						nextMeetingAgenda = trans2.getName();
-					}
-
-					result2 = nextRoom.getEventStartDate().getDayOfMonth() + " / "
-							+ nextRoom.getEventStartDate().getMonthOfYear() + " / "
-							+ nextRoom.getEventStartDate().getYear() + " from "
-							+ Util.rebuildTime(nextRoom.getEventStartTime().getHourOfDay()) + " : "
-							+ Util.rebuildTime(nextRoom.getEventStartTime().getMinuteOfHour()) + " : "
-							+ Util.rebuildTime(nextRoom.getEventStartTime().getSecondOfMinute()) + " until "
-							+ Util.rebuildTime(nextRoom.getEventEndTime().getHourOfDay()) + " : "
-							+ Util.rebuildTime(nextRoom.getEventEndTime().getMinuteOfHour()) + " : "
-							+ Util.rebuildTime(nextRoom.getEventEndTime().getSecondOfMinute()) + "\n" + " for "
-							+ nextMeetingAgenda + "\n";
-				}else{
-					result2 = "AVAILABLE" + "\n";
+			}else{
+				meetingRoom = roomName;
+				pax = "( " + roomPax + " )";
+				result1 = "AVAILABLE";
+			}
+			
+			if (nextRoom != null) {
+				EventTrans trans2 = eventTransService.findById(nextRoom.getEventId());
+				if (trans2 != null) {
+					nextMeetingAgenda = trans2.getName();
 				}
+
+				result2 = nextRoom.getEventStartDate().getDayOfMonth() + " / "
+						+ nextRoom.getEventStartDate().getMonthOfYear() + " / "
+						+ nextRoom.getEventStartDate().getYear() + " from "
+						+ Util.rebuildTime(nextRoom.getEventStartTime().getHourOfDay()) + " : "
+						+ Util.rebuildTime(nextRoom.getEventStartTime().getMinuteOfHour()) + " : "
+						+ Util.rebuildTime(nextRoom.getEventStartTime().getSecondOfMinute()) + " until "
+						+ Util.rebuildTime(nextRoom.getEventEndTime().getHourOfDay()) + " : "
+						+ Util.rebuildTime(nextRoom.getEventEndTime().getMinuteOfHour()) + " : "
+						+ Util.rebuildTime(nextRoom.getEventEndTime().getSecondOfMinute()) + "\n" + " for "
+						+ nextMeetingAgenda + "\n";
+			}else{
+				result2 = "AVAILABLE" + "\n";
 			}
 		} else {
 			meetingRoom = roomName;

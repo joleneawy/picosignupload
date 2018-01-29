@@ -1,13 +1,17 @@
 package sg.com.ctc.picoservice.model;
 
 import javax.persistence.Column;
+import javax.persistence.Entity;
 import javax.persistence.Id;
+import javax.persistence.Table;
 import javax.validation.constraints.Size;
 
 import org.hibernate.annotations.Type;
 import org.joda.time.LocalDateTime;
 import org.springframework.format.annotation.DateTimeFormat;
 
+@Entity
+@Table(name="dbo.rbm_event_trans")
 public class EventTrans {
 	
 	@Id

@@ -1,10 +1,12 @@
 package sg.com.ctc.picoservice.controller;
 
 import java.io.File;
-import java.net.URLEncoder;
-import java.util.Date;
-import java.util.List;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.UUID;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLContext;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -17,25 +19,26 @@ import org.springframework.web.bind.annotation.RestController;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPut;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLContextBuilder;
+import org.apache.http.conn.ssl.TrustStrategy;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.util.EntityUtils;
-import org.joda.time.LocalDateTime;
-
-import sg.com.ctc.picoservice.model.BookRoomTrans;
-import sg.com.ctc.picoservice.model.EventTrans;
-import sg.com.ctc.picoservice.model.RoomMast;
 import sg.com.ctc.picoservice.service.EventTransService;
 import sg.com.ctc.picoservice.service.MeetingRoomService;
 import sg.com.ctc.picoservice.service.RoomMastService;
-import sg.com.ctc.picoservice.util.Util;
 
+@SuppressWarnings("deprecation")
 @RestController
 @RequestMapping("/rest")
 public class PicoRestController {
@@ -53,151 +56,53 @@ public class PicoRestController {
 	private Environment env;
 
 	@RequestMapping(value = {
-			"/generateimage/{meetingRoomId}" }, method = RequestMethod.GET, headers = "Accept=application/json")
+			"/generate/{id}/{meetingRoomId}" }, method = RequestMethod.GET, headers = "Accept=application/json")
 	@ResponseStatus(value = HttpStatus.OK)
-	public String generateImage(@PathVariable String meetingRoomId) throws NotFoundException {
-		int timeout = 300;
-		RequestConfig config = RequestConfig.custom().setConnectTimeout(timeout * 1000)
-				.setConnectionRequestTimeout(timeout * 1000).setSocketTimeout(timeout * 1000).build();
+	public String generate(@PathVariable String id, @PathVariable String meetingRoomId) throws NotFoundException {
 
-		List<BookRoomTrans> meetingRooms = service.findMeetingRoomBookingByDate(new Date(), meetingRoomId);
-		RoomMast room = roomMastService.findById(meetingRoomId);
-
-		String filename = env.getProperty("imageFilePath") + env.getProperty("imageFileName") + ".png";
-		String text = "";
-		String roomName = "";
-		String roomPax = "";
-		String meetingAgenda = "No Title";
-		String nextMeetingAgenda = "No Title";
-		if (room != null) {
-			roomName = room.getName();
-			roomPax = room.getDesc1().replaceAll("<li>Capacity :", "");
-		}
-		if (meetingRooms.size() > 0) {
-			BookRoomTrans currentRoom = null;
-			BookRoomTrans nextRoom = null;
-			int i = 0;
-			int n = 0;
-			for (BookRoomTrans r : meetingRooms) {
-
-				LocalDateTime date = LocalDateTime.now();
-				if (currentRoom == null) {
-					if ((date.equals(r.getEventStartTime()) || date.isAfter(r.getEventStartTime()))
-							&& (date.equals(r.getEventEndTime()) || date.isBefore(r.getEventEndTime()))) {
-						currentRoom = r;
-						n = i;
-					}
-				} else {
-					if (i == n + 1) {
-						nextRoom = r;
-					}
-				}
-				i++;
-			}
-
-			if (currentRoom == null) {
-				nextRoom = meetingRooms.get(0);
-			}
-
-			if (currentRoom != null) {
-				EventTrans trans = eventTransService.findById(currentRoom.getEventId());
-				if (trans != null) {
-					meetingAgenda = trans.getName();
-				}
-				
-				text = "Meeting Room: " + roomName + "( " + roomPax + " )" + "\n" + " booked by "
-						+ currentRoom.getUser() + "\n" + " on " + currentRoom.getEventStartDate().getDayOfMonth()
-						+ " / " + currentRoom.getEventStartDate().getMonthOfYear() + " / "
-						+ currentRoom.getEventStartDate().getYear() + " from "
-						+ Util.rebuildTime(currentRoom.getEventStartTime().getHourOfDay()) + " : "
-						+ Util.rebuildTime(currentRoom.getEventStartTime().getMinuteOfHour()) + " : "
-						+ Util.rebuildTime(currentRoom.getEventStartTime().getSecondOfMinute()) + " until "
-						+ Util.rebuildTime(currentRoom.getEventEndTime().getHourOfDay()) + " : "
-						+ Util.rebuildTime(currentRoom.getEventEndTime().getMinuteOfHour()) + " : "
-						+ Util.rebuildTime(currentRoom.getEventEndTime().getSecondOfMinute()) + "\n" + " for "
-						+ meetingAgenda + "\n" + "Upcoming Booking: \n";
-				
-				if (nextRoom != null) {
-					
-					EventTrans trans2 = eventTransService.findById(nextRoom.getEventId());					
-					if (trans2 != null) {
-						nextMeetingAgenda = trans2.getName();
-					}
-
-					text = text
-							+ nextRoom.getEventStartDate().getDayOfMonth() + " / "
-							+ nextRoom.getEventStartDate().getMonthOfYear() + " / "
-							+ nextRoom.getEventStartDate().getYear() + " from "
-							+ Util.rebuildTime(nextRoom.getEventStartTime().getHourOfDay()) + " : "
-							+ Util.rebuildTime(nextRoom.getEventStartTime().getMinuteOfHour()) + " : "
-							+ Util.rebuildTime(nextRoom.getEventStartTime().getSecondOfMinute()) + " until "
-							+ Util.rebuildTime(nextRoom.getEventEndTime().getHourOfDay()) + " : "
-							+ Util.rebuildTime(nextRoom.getEventEndTime().getMinuteOfHour()) + " : "
-							+ Util.rebuildTime(nextRoom.getEventEndTime().getSecondOfMinute()) + "\n" + " for "
-							+ nextMeetingAgenda + "\n";
-				}else{
-					text = text + "AVAILABLE" + "\n";
-				}
-			}
-		} else {
-			text = "Meeting Room: " + roomName + "( " + roomPax + " )" + "\n" + "\n" + Util.buildSpace(18) + "AVAILABLE"
-					+ "\n\n"
-					+ "Upcoming Booking: \n"
-					+ "AVAILABLE \n";
-		}
-
-		System.out.println("Meeting Room Text: " + text);
-
-		CloseableHttpClient httpClientForGet = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
-
-		try {
-			System.out.println("Encode text: " + URLEncoder.encode(text, "UTF-8"));
-			String requestURLForGet = env.getProperty("img4meRestUrl") + "?bcolor="
-					+ env.getProperty("img4meBackgroudColor") + "&fcolor=" + env.getProperty("img4meFontColor")
-					+ "&font=" + env.getProperty("img4meFont") + "&size=" + env.getProperty("img4meFontSize") + "&type="
-					+ env.getProperty("img4meImgType") + "&text=" + URLEncoder.encode(text, "UTF-8") + "";
-			HttpGet httpGet = new HttpGet(requestURLForGet);
-			httpGet.addHeader("X-Mashape-Key", env.getProperty("img4meRestMashKey"));
-			httpGet.addHeader("Accept", "text/plain");
-
-			HttpResponse response = httpClientForGet.execute(httpGet);
-
-			HttpEntity entity = response.getEntity();
-
-			// Read the contents of an entity and return it as a String.
-			String content = EntityUtils.toString(entity);
-
-			StatusLine line = response.getStatusLine();
-			if (line.getStatusCode() == 200) {
-				Util.saveImage(content, filename);
-				Util.resize(filename, filename, Integer.parseInt(env.getProperty("imgResizeWidth")),
-						Integer.parseInt(env.getProperty("imgResizeHeight")));
-				// Util.resize(filename, filename,
-				// Double.parseDouble(env.getProperty("imgResizePercentage")));
-			}
-			System.out.println("Response pic: " + line);
-		} catch (Exception e) {
-			throw new NotFoundException("Failed upload: " + e.getMessage());
-		}
-
-		return "Sucessful";
-	}
-
-	@RequestMapping(value = { "/generate/{id}" }, method = RequestMethod.GET, headers = "Accept=application/json")
-	@ResponseStatus(value = HttpStatus.OK)
-	public String generate(@PathVariable String id) throws NotFoundException {
-
-		int timeout = 300;
-		RequestConfig config = RequestConfig.custom().setConnectTimeout(timeout * 1000)
-				.setConnectionRequestTimeout(timeout * 1000).setSocketTimeout(timeout * 1000).build();
 		String photoId = UUID.randomUUID().toString();
-		String filename = env.getProperty("imageFilePath") + env.getProperty("imageFileName") + ".png";
+		String filename = env.getProperty("imageFilePath") + meetingRoomId + "/" + env.getProperty("imageFileName")
+				+ ".png";
 
 		try {
+
+			HttpClientBuilder b = HttpClientBuilder.create();
+
+			// setup a Trust Strategy that allows all certificates.
+			//
+			SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustStrategy() {
+				public boolean isTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
+					return true;
+				}
+			}).build();
+			b.setSslcontext(sslContext);
+
+			// don't check Hostnames, either.
+			// -- use SSLConnectionSocketFactory.getDefaultHostnameVerifier(),
+			// if you don't want to weaken
+			HostnameVerifier hostnameVerifier = NoopHostnameVerifier.INSTANCE;
+
+			// here's the special part:
+			// -- need to create an SSL Socket Factory, to use our weakened
+			// "trust strategy";
+			// -- and create a Registry, to register it.
+			//
+			SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContext, hostnameVerifier);
+			Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
+					.register("http", PlainConnectionSocketFactory.getSocketFactory())
+					.register("https", sslSocketFactory).build();
+
+			// now, we create connection-manager using our Registry.
+			// -- allows multi-threaded use
+			PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
+			b.setConnectionManager(connMgr);
+
+			HttpClient httpclient = b.build();
 
 			String boundary = "---------------" + photoId;
 
-			CloseableHttpClient httpClient = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
+			// CloseableHttpClient httpClient =
+			// HttpClientBuilder.create().setDefaultRequestConfig(config).build();
 			String requestURL = env.getProperty("picoRestUrl") + id
 					+ "?display=0&process=true&singleupdate=false&nodither=false&whitebg="
 					+ env.getProperty("picoWhiteBackground");
@@ -216,7 +121,7 @@ public class PicoRestController {
 
 			HttpEntity entity2 = builder.build();
 			httpPut.setEntity(entity2);
-			HttpResponse response2 = httpClient.execute(httpPut);
+			HttpResponse response2 = httpclient.execute(httpPut);
 			StatusLine line2 = response2.getStatusLine();
 
 			System.out.println("Status Code: " + line2.getStatusCode());
